@@ -14,12 +14,16 @@ nuctl create project cvat --platform local
 
 shopt -s globstar
 
+echo $FUNCTIONS_DIR
+pwd
+
 for func_config in "$FUNCTIONS_DIR"/**/function.yaml
 do
     func_root="$(dirname "$func_config")"
     func_rel_path="$(realpath --relative-to="$SCRIPT_DIR" "$(dirname "$func_root")")"
 
     if [ -f "$func_root/Dockerfile" ]; then
+        echo  "Building $func_rel_path base image..."
         docker build -t "cvat.${func_rel_path//\//.}.base" "$func_root"
     fi
 
