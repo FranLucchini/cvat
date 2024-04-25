@@ -1,5 +1,5 @@
 metadata:
-  name: pth-ultralytics-yolov5
+  name: pth-ultralytics-yolov8
   namespace: cvat
   annotations:
     name: YOLO v8
@@ -91,14 +91,13 @@ metadata:
 
 
 spec:
-  description: YOLO v5 via pytorch
+  description: YOLO v8 via pytorch
   runtime: 'python:3.6'
   handler: main:handler
   eventTimeout: 30s
   build:
-    image: cvat.ultralytics.yolov5
-    baseImage: ultralytics/yolov5:latest-cpu
-
+    image: cvat.ultralytics8.2.2.yolov8
+    baseImage: ultralytics/ultralytics:8.2.2-cpu
     directives:
       preCopy:
         - kind: USER

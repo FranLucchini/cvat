@@ -16,25 +16,55 @@ def init_context(context):
 
     context.logger.info("Init context...100%")
 
+'''
+Docs:
+[
+  {
+    "name": "car",
+    "class": 2,
+    "confidence": 0.85906,
+    "box": {
+      "x1": 311.00687,
+      "y1": 328.08682,
+      "x2": 397.20529,
+      "y2": 386.55829
+    }
+  },
+  {
+    "name": "car",
+    "class": 2,
+    "confidence": 0.84335,
+    "box": {
+      "x1": 246.34537,
+      "y1": 344.90573,
+      "x2": 336.40637,
+      "y2": 412.25006
+    }
+  },
+]
+'''
 def handler(context, event):
-    context.logger.info("Run yolo-v5 model")
+    context.logger.info("Run yolo-v8 model")
     data = event.body
     buf = io.BytesIO(base64.b64decode(data["image"]))
     threshold = float(data.get("threshold", 0.5))
+
     context.user_data.model.conf = threshold
     image = Image.open(buf)
-    yolo_results_json = context.user_data.model(image).pandas().xyxy[0].to_dict(orient='records')
+    yolo_results = context.user_data.model(image)
+    # .pandas().xyxy[0].to_dict(orient='records')
+    yolo_results_json = [json.loads(det.tojson(normalize=True)) for det in yolo_results]
 
     encoded_results = []
-    for result in yolo_results_json:
+    for result in yolo_results_json[0]:
         encoded_results.append({
             'confidence': result['confidence'],
             'label': result['name'],
             'points': [
-                result['xmin'],
-                result['ymin'],
-                result['xmax'],
-                result['ymax']
+                result['box']['x1'], # xmin
+                result['box']['y1'], # ymin
+                result['box']['x2'], # xmax
+                result['box']['y2']  # ymax
             ],
             'type': 'rectangle'
         })
