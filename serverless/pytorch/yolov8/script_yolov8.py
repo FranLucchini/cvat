@@ -6,6 +6,9 @@ model = YOLO('yolov8n.pt')
 
 # Open image with Pillow
 image = Image.open('image.png')
+# Get Image width and height
+width, height = image.size
+
 results = model(image)
 
 # print(type(results))
@@ -50,10 +53,10 @@ for result in detections[0]:
         'confidence': result['confidence'],
         'label': result['name'],
         'points': [
-            result['box']['x1'],
-            result['box']['y1'],
-            result['box']['x2'],
-            result['box']['y2']
+            result['box']['x1']*width,  # xmin
+            result['box']['y1']*height, # ymin
+            result['box']['x2']*width,  # xmax
+            result['box']['y2']*height  # ymax
         ],
         'type': 'rectangle'
     })

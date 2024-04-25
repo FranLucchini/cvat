@@ -51,6 +51,10 @@ def handler(context, event):
 
     context.user_data.model.conf = threshold
     image = Image.open(buf)
+
+    # Get Image width and height
+    width, height = image.size
+
     yolo_results = context.user_data.model(image)
     # .pandas().xyxy[0].to_dict(orient='records')
     yolo_results_json = [json.loads(det.tojson(normalize=True)) for det in yolo_results]
@@ -61,10 +65,10 @@ def handler(context, event):
             'confidence': result['confidence'],
             'label': result['name'],
             'points': [
-                result['box']['x1'], # xmin
-                result['box']['y1'], # ymin
-                result['box']['x2'], # xmax
-                result['box']['y2']  # ymax
+                result['box']['x1']*width,  # xmin
+                result['box']['y1']*height, # ymin
+                result['box']['x2']*width,  # xmax
+                result['box']['y2']*height  # ymax
             ],
             'type': 'rectangle'
         })
