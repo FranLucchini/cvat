@@ -1,0 +1,47 @@
+metadata:
+  name: yolov8-lencu-data # Change
+  namespace: cvat
+  annotations:
+    name: LENCU YOLO v8 # Change
+    type: detector
+    framework: pytorch
+    spec: | # Change
+      [
+        { "id": 0, "name": "AMBEL" },
+        { "id": 1, "name": "LENCU" },
+        { "id": 2, "name": "POLAV" },
+        { "id": 3, "name": "POLPE" }
+      ]
+
+
+spec:
+  description: LENCU YOLOv8 # Change
+  runtime: 'python:3.6'
+  handler: main:handler
+  eventTimeout: 30s
+  build:
+    image: cvat.ultralytics8.2.2.lencu.yolov8 # Change
+    baseImage: ultralytics/ultralytics:8.2.2-cpu
+    directives:
+      preCopy:
+        - kind: USER
+          value: root
+        - kind: RUN
+          value: apt update && apt install --no-install-recommends -y libglib2.0-0
+        - kind: WORKDIR
+          value: /opt/nuclio
+
+  triggers:
+    myHttpTrigger:
+      maxWorkers: 2
+      kind: 'http'
+      workerAvailabilityTimeoutMilliseconds: 10000
+      attributes:
+        maxRequestBodySize: 33554432 # 32MB
+
+  platform:
+    attributes:
+      restartPolicy:
+        name: always
+        maximumRetryCount: 3
+      mountMode: volume

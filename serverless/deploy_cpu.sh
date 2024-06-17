@@ -32,4 +32,6 @@ do
         --file "$func_config" --platform local
 done
 
+
+echo 
 nuctl get function --platform local
