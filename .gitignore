@@ -65,3 +65,4 @@ cvat-core/reports
 
 yolov8n.pt
 serverless/pytorch/yolov8/lencu_yolo/best.pt
+*.log.txt
