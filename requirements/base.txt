@@ -1,0 +1,10 @@
+datumaro[default]==1.7.0
+# spherogram 2.2.1 requires snappy-manifolds>=1.1.2, which is not installed.
+# boxmot 10.0.46 requires numpy==1.24.4, but you have numpy 1.22.4 which is incompatible.
+# dvc 3.50.2 requires attrs>=22.2.0, but you have attrs 21.4.0 which is incompatible.
+# opentelemetry-api 1.24.0 requires importlib-metadata<=7.0,>=6.0, but you have importlib-metadata 7.1.0 which is incompatible.
+# tensorflow 2.16.2 requires numpy<2.0.0,>=1.23.5; python_version <= "3.11", but you have numpy 1.22.4 which is incompatible.
+# tensorflow-metadata 1.15.0 requires protobuf<4.21,>=3.20.3; python_version < "3.11", but you have protobuf 4.25.3 which is incompatible.
+# tensorflow-model-optimization 0.8.0 requires numpy~=1.23, but you have numpy 1.22.4 which is incompatible.
+
+snappy-manifolds>=1.1.2

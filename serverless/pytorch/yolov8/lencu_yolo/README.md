@@ -12,5 +12,5 @@ serverless/deploy_cpu.sh serverless/pytorch/yolov8
 
 ```
 docker ps | grep yolov8
-docker logs nuclio-nuclio-pth-ultralytics-yolov8
+docker logs nuclio-nuclio-yolov8-lencu-data
 ```
