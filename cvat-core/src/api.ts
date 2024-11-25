@@ -16,12 +16,20 @@ import Project from './project';
 import implementProject from './project-implementation';
 import { Attribute, Label } from './labels';
 import MLModel from './ml-model';
-import { FrameData } from './frames';
+import { FrameData, FramesMetaData } from './frames';
 import CloudStorage from './cloud-storage';
 import Organization from './organization';
 import Webhook from './webhook';
 import AnnotationGuide from './guide';
-import BaseSingleFrameAction from './annotations-actions';
+import { BaseAction } from './annotations-actions/base-action';
+import { BaseCollectionAction } from './annotations-actions/base-collection-action';
+import { BaseShapesAction } from './annotations-actions/base-shapes-action';
+import QualityReport from './quality-report';
+import QualityConflict from './quality-conflict';
+import QualitySettings from './quality-settings';
+import AnalyticsReport from './analytics-report';
+import { JobValidationLayout, TaskValidationLayout } from './validation-layout';
+import { Request } from './request';
 
 import * as enums from './enums';
 
@@ -29,7 +37,7 @@ import {
     Exception, ArgumentError, DataError, ScriptingError, ServerError,
 } from './exceptions';
 
-import { mask2Rle, rle2Mask } from './object-utils';
+import { mask2Rle, rle2Mask, propagateShapes } from './object-utils';
 import User from './user';
 import pjson from '../package.json';
 import config from './config';
@@ -121,10 +129,6 @@ function build(): CVATCore {
                 const result = await PluginRegistry.apiWrapper(cvat.server.setAuthData, response);
                 return result;
             },
-            async removeAuthData() {
-                const result = await PluginRegistry.apiWrapper(cvat.server.removeAuthData);
-                return result;
-            },
             async installedApps() {
                 const result = await PluginRegistry.apiWrapper(cvat.server.installedApps);
                 return result;
@@ -189,14 +193,14 @@ function build(): CVATCore {
                 const result = await PluginRegistry.apiWrapper(cvat.actions.list);
                 return result;
             },
-            async register(action: BaseSingleFrameAction) {
+            async register(action: BaseAction) {
                 const result = await PluginRegistry.apiWrapper(cvat.actions.register, action);
                 return result;
             },
             async run(
                 instance: Job | Task,
-                actionsChain: BaseSingleFrameAction[],
-                actionsParameters: Record<string, string>[],
+                actions: BaseAction,
+                actionsParameters: Record<string, string>,
                 frameFrom: number,
                 frameTo: number,
                 filters: string[],
@@ -209,11 +213,35 @@ function build(): CVATCore {
                 const result = await PluginRegistry.apiWrapper(
                     cvat.actions.run,
                     instance,
-                    actionsChain,
+                    actions,
                     actionsParameters,
                     frameFrom,
                     frameTo,
                     filters,
+                    onProgress,
+                    cancelled,
+                );
+                return result;
+            },
+            async call(
+                instance: Job | Task,
+                actions: BaseAction,
+                actionsParameters: Record<string, string>,
+                frame: number,
+                states: ObjectState[],
+                onProgress: (
+                    message: string,
+                    progress: number,
+                ) => void,
+                cancelled: () => boolean,
+            ) {
+                const result = await PluginRegistry.apiWrapper(
+                    cvat.actions.call,
+                    instance,
+                    actions,
+                    actionsParameters,
+                    frame,
+                    states,
                     onProgress,
                     cancelled,
                 );
@@ -285,6 +313,12 @@ function build(): CVATCore {
             },
             set globalObjectsCounter(value: number) {
                 config.globalObjectsCounter = value;
+            },
+            get requestsStatusDelay() {
+                return config.requestsStatusDelay;
+            },
+            set requestsStatusDelay(value) {
+                config.requestsStatusDelay = value;
             },
         },
         client: {
@@ -374,6 +408,26 @@ function build(): CVATCore {
                 },
             },
         },
+        requests: {
+            async list() {
+                const result = await PluginRegistry.apiWrapper(cvat.requests.list);
+                return result;
+            },
+            async cancel(rqID: string) {
+                const result = await PluginRegistry.apiWrapper(cvat.requests.cancel, rqID);
+                return result;
+            },
+            async listen(
+                rqID: string,
+                options: {
+                    callback: (request: Request) => void,
+                    initialRequest?: Request,
+                },
+            ) {
+                const result = await PluginRegistry.apiWrapper(cvat.requests.listen, rqID, options);
+                return result;
+            },
+        },
         classes: {
             User,
             Project: implementProject(Project),
@@ -392,11 +446,21 @@ function build(): CVATCore {
             Organization,
             Webhook,
             AnnotationGuide,
-            BaseSingleFrameAction,
+            BaseShapesAction,
+            BaseCollectionAction,
+            QualitySettings,
+            AnalyticsReport,
+            QualityConflict,
+            QualityReport,
+            Request,
+            FramesMetaData,
+            JobValidationLayout,
+            TaskValidationLayout,
         },
         utils: {
             mask2Rle,
             rle2Mask,
+            propagateShapes,
         },
     };
 

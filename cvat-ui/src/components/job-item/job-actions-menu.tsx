@@ -6,24 +6,22 @@ import React, { useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { useHistory } from 'react-router';
 import Modal from 'antd/lib/modal';
-import { exportActions } from 'actions/export-actions';
 
-import {
-    Job, JobStage, JobState, JobType,
-} from 'cvat-core-wrapper';
+import { exportActions } from 'actions/export-actions';
 import { deleteJobAsync } from 'actions/jobs-actions';
 import { importActions } from 'actions/import-actions';
+import { Job, JobType } from 'cvat-core-wrapper';
 import Menu, { MenuInfo } from 'components/dropdown-menu';
 
 interface Props {
     job: Job;
-    onJobUpdate: (job: Job, fields: Parameters<Job['save']>[0]) => void;
 }
 
 function JobActionsMenu(props: Props): JSX.Element {
-    const { job, onJobUpdate } = props;
-    const history = useHistory();
+    const { job } = props;
+
     const dispatch = useDispatch();
+    const history = useHistory();
 
     const onDelete = useCallback(() => {
         Modal.confirm({
@@ -59,16 +57,6 @@ function JobActionsMenu(props: Props): JSX.Element {
                     dispatch(exportActions.openExportDatasetModal(job));
                 } else if (action.key === 'view_analytics') {
                     history.push(`/tasks/${job.taskId}/jobs/${job.id}/analytics`);
-                } else if (action.key === 'renew_job') {
-                    onJobUpdate(job, {
-                        state: JobState.NEW,
-                        stage: JobStage.ANNOTATION,
-                    });
-                } else if (action.key === 'finish_job') {
-                    onJobUpdate(job, {
-                        state: JobState.COMPLETED,
-                        stage: JobStage.ACCEPTANCE,
-                    });
                 }
             }}
         >
@@ -78,10 +66,6 @@ function JobActionsMenu(props: Props): JSX.Element {
             <Menu.Item key='import_job'>Import annotations</Menu.Item>
             <Menu.Item key='export_job'>Export annotations</Menu.Item>
             <Menu.Item key='view_analytics'>View analytics</Menu.Item>
-            {[JobStage.ANNOTATION, JobStage.VALIDATION].includes(job.stage) ?
-                <Menu.Item key='finish_job'>Finish the job</Menu.Item> : null}
-            {job.stage === JobStage.ACCEPTANCE ?
-                <Menu.Item key='renew_job'>Renew the job</Menu.Item> : null}
             <Menu.Divider />
             <Menu.Item
                 key='delete'
