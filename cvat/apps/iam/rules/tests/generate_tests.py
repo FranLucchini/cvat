@@ -7,10 +7,9 @@
 import subprocess
 import sys
 from argparse import ArgumentParser, Namespace
-from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from typing import Optional
+from typing import Optional, Sequence
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[5]

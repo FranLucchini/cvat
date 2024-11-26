@@ -21,7 +21,6 @@ import message from 'antd/lib/message';
 import {
     ActiveControl, CombinedState, NavigationType, ObjectType,
 } from 'reducers';
-import { labelShapeType } from 'reducers/annotation-reducer';
 import { Canvas, CanvasMode } from 'cvat-canvas-wrapper';
 import {
     Job, Label, LabelType, ShapeType,
@@ -260,7 +259,6 @@ function SingleShapeSidebar(): JSX.Element {
             appDispatch(rememberObject({
                 activeObjectType: ObjectType.SHAPE,
                 activeLabelID: state.label.id,
-                activeShapeType: labelShapeType(state.label),
             }));
 
             canvas.draw({

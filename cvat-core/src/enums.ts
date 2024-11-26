@@ -148,7 +148,6 @@ export enum HistoryActions {
     REMOVED_OBJECT = 'Removed object',
     REMOVED_FRAME = 'Removed frame',
     RESTORED_FRAME = 'Restored frame',
-    COMMIT_ANNOTATIONS = 'Commit annotations',
 }
 
 export enum ModelKind {

@@ -21,9 +21,7 @@ import CloudStorage from './cloud-storage';
 import Organization from './organization';
 import Webhook from './webhook';
 import AnnotationGuide from './guide';
-import { BaseAction } from './annotations-actions/base-action';
-import { BaseCollectionAction } from './annotations-actions/base-collection-action';
-import { BaseShapesAction } from './annotations-actions/base-shapes-action';
+import BaseSingleFrameAction from './annotations-actions';
 import QualityReport from './quality-report';
 import QualityConflict from './quality-conflict';
 import QualitySettings from './quality-settings';
@@ -193,14 +191,14 @@ function build(): CVATCore {
                 const result = await PluginRegistry.apiWrapper(cvat.actions.list);
                 return result;
             },
-            async register(action: BaseAction) {
+            async register(action: BaseSingleFrameAction) {
                 const result = await PluginRegistry.apiWrapper(cvat.actions.register, action);
                 return result;
             },
             async run(
                 instance: Job | Task,
-                actions: BaseAction,
-                actionsParameters: Record<string, string>,
+                actionsChain: BaseSingleFrameAction[],
+                actionsParameters: Record<string, string>[],
                 frameFrom: number,
                 frameTo: number,
                 filters: string[],
@@ -213,35 +211,11 @@ function build(): CVATCore {
                 const result = await PluginRegistry.apiWrapper(
                     cvat.actions.run,
                     instance,
-                    actions,
+                    actionsChain,
                     actionsParameters,
                     frameFrom,
                     frameTo,
                     filters,
-                    onProgress,
-                    cancelled,
-                );
-                return result;
-            },
-            async call(
-                instance: Job | Task,
-                actions: BaseAction,
-                actionsParameters: Record<string, string>,
-                frame: number,
-                states: ObjectState[],
-                onProgress: (
-                    message: string,
-                    progress: number,
-                ) => void,
-                cancelled: () => boolean,
-            ) {
-                const result = await PluginRegistry.apiWrapper(
-                    cvat.actions.call,
-                    instance,
-                    actions,
-                    actionsParameters,
-                    frame,
-                    states,
                     onProgress,
                     cancelled,
                 );
@@ -446,8 +420,7 @@ function build(): CVATCore {
             Organization,
             Webhook,
             AnnotationGuide,
-            BaseShapesAction,
-            BaseCollectionAction,
+            BaseSingleFrameAction,
             QualitySettings,
             AnalyticsReport,
             QualityConflict,

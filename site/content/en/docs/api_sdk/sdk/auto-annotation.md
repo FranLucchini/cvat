@@ -68,12 +68,7 @@ class TorchvisionDetectionFunction:
             ]
         )
 
-    def detect(
-        self, context: cvataa.DetectionFunctionContext, image: PIL.Image.Image
-    ) -> list[models.LabeledShapeRequest]:
-        # determine the threshold for filtering results
-        conf_threshold = context.conf_threshold or 0
-
+    def detect(self, context, image: PIL.Image.Image) -> List[models.LabeledShapeRequest]:
         # convert the input into a form the model can understand
         transformed_image = [self._transforms(image)]
 
@@ -84,8 +79,7 @@ class TorchvisionDetectionFunction:
         return [
             cvataa.rectangle(label.item(), [x.item() for x in box])
             for result in results
-            for box, label, score in zip(result["boxes"], result["labels"], result["scores"])
-            if score >= conf_threshold
+            for box, label in zip(result['boxes'], result['labels'])
         ]
 
 # log into the CVAT server
@@ -118,13 +112,9 @@ that these objects must follow.
 `detect` must be a function/method accepting two parameters:
 
 - `context` (`DetectionFunctionContext`).
-  Contains invocation parameters and information about the current image.
-  The following fields are available:
-
-  - `frame_name` (`str`). The file name of the frame on the CVAT server.
-  - `conf_threshold` (`float | None`). The confidence threshold that the function
-    should use to filter objects. If `None`, the function may apply a default
-    threshold at its discretion.
+  Contains information about the current image.
+  Currently `DetectionFunctionContext` only contains a single field, `frame_name`,
+  which contains the file name of the frame on the CVAT server.
 
 - `image` (`PIL.Image.Image`).
   Contains image data.
@@ -181,22 +171,9 @@ The following helpers are available for use in `detect`:
 | Name        | Model type               | Fixed attributes              |
 |-------------|--------------------------|-------------------------------|
 | `shape`     | `LabeledShapeRequest`    | `frame=0`                     |
-| `mask`      | `LabeledShapeRequest`    | `frame=0`, `type="mask"`      |
-| `polygon`   | `LabeledShapeRequest`    | `frame=0`, `type="polygon"`   |
 | `rectangle` | `LabeledShapeRequest`    | `frame=0`, `type="rectangle"` |
 | `skeleton`  | `LabeledShapeRequest`    | `frame=0`, `type="skeleton"`  |
 | `keypoint`  | `SubLabeledShapeRequest` | `frame=0`, `type="points"`    |
-
-For `mask`, it is recommended to create the points list using
-the `cvat.masks.encode_mask` function, which will convert a bitmap into a
-list in the format that CVAT expects. For example:
-
-```python
-cvataa.mask(my_label, encode_mask(
-    my_mask,  # boolean 2D array, same size as the input image
-    [x1, y1, x2, y2],  # top left and bottom right coordinates of the mask
-))
-```
 
 ## Auto-annotation driver
 
@@ -217,9 +194,6 @@ then by default, `BadFunctionError` is raised, and auto-annotation is aborted.
 If you use `allow_unmatched_label=True`, then such labels will be ignored,
 and any shapes referring to them will be dropped.
 Same logic applies to sub-label IDs.
-
-It's possible to pass a custom confidence threshold to the function via the
-`conf_threshold` parameter.
 
 `annotate_task` will raise a `BadFunctionError` exception
 if it detects that the function violated the AA function protocol.
@@ -270,18 +244,10 @@ The `create` function accepts the following parameters:
 It also accepts arbitrary additional parameters,
 which are passed directly to the model constructor.
 
-### `cvat_sdk.auto_annotation.functions.torchvision_instance_segmentation`
-
-This AA function is analogous to `torchvision_detection`,
-except it uses torchvision's instance segmentation models and produces mask
-or polygon annotations (depending on the value of `conv_mask_to_poly`).
-
-Refer to that function's description for usage instructions and parameter information.
-
 ### `cvat_sdk.auto_annotation.functions.torchvision_keypoint_detection`
 
 This AA function is analogous to `torchvision_detection`,
 except it uses torchvision's keypoint detection models and produces skeleton annotations.
 Keypoints which the model marks as invisible will be marked as occluded in CVAT.
 
-Refer to that function's description for usage instructions and parameter information.
+Refer to the previous section for usage instructions and parameter information.

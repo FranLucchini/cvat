@@ -519,18 +519,6 @@ export function implementJob(Job: typeof JobClass): typeof JobClass {
         },
     });
 
-    Object.defineProperty(Job.prototype.annotations.commit, 'implementation', {
-        value: function commitAnnotationsImplementation(
-            this: JobClass,
-            added: Parameters<typeof JobClass.prototype.annotations.commit>[0],
-            removed: Parameters<typeof JobClass.prototype.annotations.commit>[1],
-            frame: Parameters<typeof JobClass.prototype.annotations.commit>[2],
-        ): ReturnType<typeof JobClass.prototype.annotations.commit> {
-            getCollection(this).commit(added, removed, frame);
-            return Promise.resolve();
-        },
-    });
-
     Object.defineProperty(Job.prototype.annotations.upload, 'implementation', {
         value: async function uploadAnnotationsImplementation(
             this: JobClass,
@@ -1217,18 +1205,6 @@ export function implementTask(Task: typeof TaskClass): typeof TaskClass {
             this: TaskClass,
         ): ReturnType<typeof TaskClass.prototype.annotations.export> {
             return Promise.resolve(getCollection(this).export());
-        },
-    });
-
-    Object.defineProperty(Task.prototype.annotations.commit, 'implementation', {
-        value: function commitAnnotationsImplementation(
-            this: TaskClass,
-            added: Parameters<typeof TaskClass.prototype.annotations.commit>[0],
-            removed: Parameters<typeof TaskClass.prototype.annotations.commit>[1],
-            frame: Parameters<typeof TaskClass.prototype.annotations.commit>[2],
-        ): ReturnType<typeof TaskClass.prototype.annotations.commit> {
-            getCollection(this).commit(added, removed, frame);
-            return Promise.resolve();
         },
     });
 

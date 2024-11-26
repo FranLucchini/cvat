@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Tuple
 import functools
 import hashlib
 import importlib
@@ -13,7 +14,7 @@ _OPA_RULES_PATHS = {
 }
 
 @functools.lru_cache(maxsize=None)
-def get_opa_bundle() -> tuple[bytes, str]:
+def get_opa_bundle() -> Tuple[bytes, str]:
     bundle_file = io.BytesIO()
 
     with tarfile.open(fileobj=bundle_file, mode='w:gz') as tar:

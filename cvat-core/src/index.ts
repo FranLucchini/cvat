@@ -34,14 +34,7 @@ import AnalyticsReport from './analytics-report';
 import AnnotationGuide from './guide';
 import { JobValidationLayout, TaskValidationLayout } from './validation-layout';
 import { Request } from './request';
-import {
-    runAction,
-    callAction,
-    listActions,
-    registerAction,
-} from './annotations-actions/annotations-actions';
-import { BaseCollectionAction } from './annotations-actions/base-collection-action';
-import { BaseShapesAction } from './annotations-actions/base-shapes-action';
+import BaseSingleFrameAction, { listActions, registerAction, runActions } from './annotations-actions';
 import {
     ArgumentError, DataError, Exception, ScriptingError, ServerError,
 } from './exceptions';
@@ -172,8 +165,7 @@ export default interface CVATCore {
     actions: {
         list: typeof listActions;
         register: typeof registerAction;
-        run: typeof runAction;
-        call: typeof callAction;
+        run: typeof runActions;
     };
     logger: typeof logger;
     config: {
@@ -217,8 +209,7 @@ export default interface CVATCore {
         Organization: typeof Organization;
         Webhook: typeof Webhook;
         AnnotationGuide: typeof AnnotationGuide;
-        BaseShapesAction: typeof BaseShapesAction;
-        BaseCollectionAction: typeof BaseCollectionAction;
+        BaseSingleFrameAction: typeof BaseSingleFrameAction;
         QualityReport: typeof QualityReport;
         QualityConflict: typeof QualityConflict;
         QualitySettings: typeof QualitySettings;

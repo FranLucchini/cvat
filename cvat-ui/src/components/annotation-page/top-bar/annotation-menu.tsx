@@ -6,6 +6,7 @@
 import React, { useCallback, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useHistory } from 'react-router';
+import { createRoot } from 'react-dom/client';
 import Modal from 'antd/lib/modal';
 import Text from 'antd/lib/typography/Text';
 import InputNumber from 'antd/lib/input-number';
@@ -21,7 +22,7 @@ import { MainMenuIcon } from 'icons';
 import { Job, JobState } from 'cvat-core-wrapper';
 
 import CVATTooltip from 'components/common/cvat-tooltip';
-import { openAnnotationsActionModal } from 'components/annotation-page/annotations-actions/annotations-actions-modal';
+import AnnotationsActionsModalContent from 'components/annotation-page/annotations-actions/annotations-actions-modal';
 import { CombinedState } from 'reducers';
 import {
     updateCurrentJobAsync, finishCurrentJobAsync,
@@ -178,7 +179,17 @@ function AnnotationMenuComponent(): JSX.Element {
         key: Actions.RUN_ACTIONS,
         label: 'Run actions',
         onClick: () => {
-            openAnnotationsActionModal();
+            const div = window.document.createElement('div');
+            window.document.body.append(div);
+            const root = createRoot(div);
+            root.render(
+                <AnnotationsActionsModalContent
+                    onClose={() => {
+                        root.unmount();
+                        div.remove();
+                    }}
+                />,
+            );
         },
     });
 

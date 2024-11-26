@@ -10,9 +10,7 @@ import { AuthActionTypes } from 'actions/auth-actions';
 import { BoundariesActionTypes } from 'actions/boundaries-actions';
 import { Canvas, CanvasMode } from 'cvat-canvas-wrapper';
 import { Canvas3d } from 'cvat-canvas3d-wrapper';
-import {
-    DimensionType, JobStage, Label, LabelType,
-} from 'cvat-core-wrapper';
+import { DimensionType, JobStage, LabelType } from 'cvat-core-wrapper';
 import { clamp } from 'utils/math';
 
 import {
@@ -29,16 +27,6 @@ function updateActivatedStateID(newStates: any[], prevActivatedStateID: number |
     return prevActivatedStateID === null || newStates.some((_state: any) => _state.clientID === prevActivatedStateID) ?
         prevActivatedStateID :
         null;
-}
-
-export function labelShapeType(label?: Label): ShapeType | null {
-    if (label && Object.values(ShapeType).includes(label.type as any)) {
-        return label.type as unknown as ShapeType;
-    }
-    if (label?.type === LabelType.TAG) {
-        return null;
-    }
-    return ShapeType.RECTANGLE;
 }
 
 const defaultState: AnnotationState = {
@@ -195,11 +183,12 @@ export default (state = defaultState, action: AnyAction): AnnotationState => {
             const isReview = job.stage === JobStage.VALIDATION;
             let workspaceSelected = null;
             let activeObjectType;
-            let activeShapeType = null;
+            let activeShapeType;
             if (defaultLabel?.type === LabelType.TAG) {
                 activeObjectType = ObjectType.TAG;
             } else {
-                activeShapeType = labelShapeType(defaultLabel);
+                activeShapeType = defaultLabel && defaultLabel.type !== 'any' ?
+                    defaultLabel.type : ShapeType.RECTANGLE;
                 activeObjectType = job.mode === 'interpolation' ? ObjectType.TRACK : ObjectType.SHAPE;
             }
 
@@ -246,10 +235,6 @@ export default (state = defaultState, action: AnyAction): AnnotationState => {
                 annotations: {
                     ...state.annotations,
                     filters,
-                    zLayer: {
-                        ...state.annotations.zLayer,
-                        cur: Number.MAX_SAFE_INTEGER,
-                    },
                 },
                 player: {
                     ...state.player,

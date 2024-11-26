@@ -5,7 +5,7 @@
 
 import { HistoryActions } from './enums';
 
-const MAX_HISTORY_LENGTH = 32;
+const MAX_HISTORY_LENGTH = 128;
 
 interface ActionItem {
     action: HistoryActions;

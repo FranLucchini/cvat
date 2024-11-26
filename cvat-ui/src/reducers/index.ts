@@ -769,7 +769,7 @@ export interface AnnotationState {
     drawing: {
         activeInteractor?: MLModel | OpenCVTool;
         activeInteractorParameters?: MLModel['params']['canvas'];
-        activeShapeType: ShapeType | null;
+        activeShapeType: ShapeType;
         activeRectDrawingMethod?: RectDrawingMethod;
         activeCuboidDrawingMethod?: CuboidDrawingMethod;
         activeNumOfPoints?: number;

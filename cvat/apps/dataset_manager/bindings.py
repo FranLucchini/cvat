@@ -20,6 +20,9 @@ import datumaro as dm
 import defusedxml.ElementTree as ET
 import rq
 from attr import attrib, attrs
+from datumaro.components.media import PointCloud
+from datumaro.components.environment import Environment
+from datumaro.components.extractor import Importer
 from datumaro.components.format_detection import RejectionReason
 from django.db.models import QuerySet
 from django.utils import timezone
@@ -1460,22 +1463,19 @@ class ProjectData(InstanceLabelData):
         self._project_annotation.add_task(task, files, self)
 
 @attrs(frozen=True, auto_attribs=True)
-class MediaSource:
+class ImageSource:
     db_task: Task
+    is_video: bool = attrib(kw_only=True)
 
-    @property
-    def is_video(self) -> bool:
-        return self.db_task.mode == 'interpolation'
-
-class MediaProvider:
-    def __init__(self, sources: Dict[int, MediaSource]) -> None:
+class ImageProvider:
+    def __init__(self, sources: Dict[int, ImageSource]) -> None:
         self._sources = sources
 
     def unload(self) -> None:
         pass
 
-class MediaProvider2D(MediaProvider):
-    def __init__(self, sources: Dict[int, MediaSource]) -> None:
+class ImageProvider2D(ImageProvider):
+    def __init__(self, sources: Dict[int, ImageSource]) -> None:
         super().__init__(sources)
         self._current_source_id = None
         self._frame_provider = None
@@ -1483,7 +1483,7 @@ class MediaProvider2D(MediaProvider):
     def unload(self) -> None:
         self._unload_source()
 
-    def get_media_for_frame(self, source_id: int, frame_index: int, **image_kwargs) -> dm.Image:
+    def get_image_for_frame(self, source_id: int, frame_index: int, **image_kwargs):
         source = self._sources[source_id]
 
         if source.is_video:
@@ -1510,7 +1510,7 @@ class MediaProvider2D(MediaProvider):
 
             return dm.ByteImage(data=image_loader, **image_kwargs)
 
-    def _load_source(self, source_id: int, source: MediaSource) -> None:
+    def _load_source(self, source_id: int, source: ImageSource) -> None:
         if self._current_source_id == source_id:
             return
 
@@ -1525,8 +1525,8 @@ class MediaProvider2D(MediaProvider):
 
         self._current_source_id = None
 
-class MediaProvider3D(MediaProvider):
-    def __init__(self, sources: Dict[int, MediaSource]) -> None:
+class ImageProvider3D(ImageProvider):
+    def __init__(self, sources: Dict[int, ImageSource]) -> None:
         super().__init__(sources)
         self._images_per_source = {
             source_id: {
@@ -1536,7 +1536,7 @@ class MediaProvider3D(MediaProvider):
             for source_id, source in sources.items()
         }
 
-    def get_media_for_frame(self, source_id: int, frame_id: int, **image_kwargs) -> dm.PointCloud:
+    def get_image_for_frame(self, source_id: int, frame_id: int, **image_kwargs):
         source = self._sources[source_id]
 
         point_cloud_path = osp.join(
@@ -1546,17 +1546,17 @@ class MediaProvider3D(MediaProvider):
         image = self._images_per_source[source_id][frame_id]
 
         related_images = [
-            dm.Image(path=path)
+            path
             for rf in image.related_files.all()
             for path in [osp.realpath(str(rf.path))]
             if osp.isfile(path)
         ]
 
-        return dm.PointCloud(point_cloud_path, extra_images=related_images)
+        return point_cloud_path, related_images
 
-MEDIA_PROVIDERS_BY_DIMENSION: Dict[DimensionType, MediaProvider] = {
-    DimensionType.DIM_3D: MediaProvider3D,
-    DimensionType.DIM_2D: MediaProvider2D,
+IMAGE_PROVIDERS_BY_DIMENSION = {
+    DimensionType.DIM_3D: ImageProvider3D,
+    DimensionType.DIM_2D: ImageProvider2D,
 }
 
 class CVATDataExtractorMixin:
@@ -1565,14 +1565,14 @@ class CVATDataExtractorMixin:
     ):
         self.convert_annotations = convert_annotations or convert_cvat_anno_to_dm
 
-        self._media_provider: Optional[MediaProvider] = None
+        self._image_provider: Optional[ImageProvider] = None
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
-        if self._media_provider:
-            self._media_provider.unload()
+        if self._image_provider:
+            self._image_provider.unload()
 
     def categories(self) -> dict:
         raise NotImplementedError()
@@ -1639,7 +1639,7 @@ class CvatTaskOrJobDataExtractor(dm.SourceExtractor, CVATDataExtractorMixin):
         instance_meta = instance_data.meta[instance_data.META_FIELD]
         dm.SourceExtractor.__init__(
             self,
-            media_type=dm.Image if dimension == DimensionType.DIM_2D else dm.PointCloud,
+            media_type=dm.Image if dimension == DimensionType.DIM_2D else PointCloud,
             subset=instance_meta['subset'],
         )
         CVATDataExtractorMixin.__init__(self, **kwargs)
@@ -1648,6 +1648,7 @@ class CvatTaskOrJobDataExtractor(dm.SourceExtractor, CVATDataExtractorMixin):
         self._user = self._load_user_info(instance_meta) if dimension == DimensionType.DIM_3D else {}
         self._dimension = dimension
         self._format_type = format_type
+        dm_items = []
 
         is_video = instance_meta['mode'] == 'interpolation'
         ext = ''
@@ -1662,61 +1663,46 @@ class CvatTaskOrJobDataExtractor(dm.SourceExtractor, CVATDataExtractorMixin):
             else:
                 assert False
 
-            self._media_provider = MEDIA_PROVIDERS_BY_DIMENSION[dimension](
-                {0: MediaSource(db_task)}
+            self._image_provider = IMAGE_PROVIDERS_BY_DIMENSION[dimension](
+                {0: ImageSource(db_task, is_video=is_video)}
             )
 
-        dm_items: List[dm.DatasetItem] = []
         for frame_data in instance_data.group_by_frame(include_empty=True):
-            dm_media_args = { 'path': frame_data.name + ext }
+            image_args = {
+                'path': frame_data.name + ext,
+                'size': (frame_data.height, frame_data.width),
+            }
+
             if dimension == DimensionType.DIM_3D:
-                dm_media: dm.PointCloud = self._media_provider.get_media_for_frame(
-                    0, frame_data.id, **dm_media_args
-                )
-
-                if not include_images:
-                    dm_media_args["extra_images"] = [
-                        dm.Image(path=osp.basename(image.path))
-                        for image in dm_media.extra_images
-                    ]
-                    dm_media = dm.PointCloud(**dm_media_args)
+                dm_image = self._image_provider.get_image_for_frame(0, frame_data.id, **image_args)
+            elif include_images:
+                dm_image = self._image_provider.get_image_for_frame(0, frame_data.idx, **image_args)
             else:
-                dm_media_args['size'] = (frame_data.height, frame_data.width)
-                if include_images:
-                    dm_media: dm.Image = self._media_provider.get_media_for_frame(
-                        0, frame_data.idx, **dm_media_args
-                    )
-                else:
-                    dm_media = dm.Image(**dm_media_args)
-
+                dm_image = dm.Image(**image_args)
             dm_anno = self._read_cvat_anno(frame_data, instance_meta['labels'])
-
-            dm_attributes = {'frame': frame_data.frame}
 
             if dimension == DimensionType.DIM_2D:
                 dm_item = dm.DatasetItem(
-                    id=osp.splitext(frame_data.name)[0],
-                    subset=frame_data.subset,
-                    annotations=dm_anno,
-                    media=dm_media,
-                    attributes=dm_attributes,
-                )
+                        id=osp.splitext(frame_data.name)[0],
+                        annotations=dm_anno, media=dm_image,
+                        subset=frame_data.subset,
+                        attributes={'frame': frame_data.frame
+                    })
             elif dimension == DimensionType.DIM_3D:
+                attributes = {'frame': frame_data.frame}
                 if format_type == "sly_pointcloud":
-                    dm_attributes["name"] = self._user["name"]
-                    dm_attributes["createdAt"] = self._user["createdAt"]
-                    dm_attributes["updatedAt"] = self._user["updatedAt"]
-                    dm_attributes["labels"] = []
+                    attributes["name"] = self._user["name"]
+                    attributes["createdAt"] = self._user["createdAt"]
+                    attributes["updatedAt"] = self._user["updatedAt"]
+                    attributes["labels"] = []
                     for (idx, (_, label)) in enumerate(instance_meta['labels']):
-                        dm_attributes["labels"].append({"label_id": idx, "name": label["name"], "color": label["color"], "type": label["type"]})
-                        dm_attributes["track_id"] = -1
+                        attributes["labels"].append({"label_id": idx, "name": label["name"], "color": label["color"], "type": label["type"]})
+                        attributes["track_id"] = -1
 
                 dm_item = dm.DatasetItem(
                     id=osp.splitext(osp.split(frame_data.name)[-1])[0],
-                    subset=frame_data.subset,
-                    annotations=dm_anno,
-                    media=dm_media,
-                    attributes=dm_attributes,
+                    annotations=dm_anno, media=PointCloud(dm_image[0]), related_images=dm_image[1],
+                    attributes=attributes, subset=frame_data.subset,
                 )
 
             dm_items.append(dm_item)
@@ -1746,7 +1732,7 @@ class CVATProjectDataExtractor(dm.Extractor, CVATDataExtractorMixin):
         **kwargs
     ):
         dm.Extractor.__init__(
-            self, media_type=dm.Image if dimension == DimensionType.DIM_2D else dm.PointCloud
+            self, media_type=dm.Image if dimension == DimensionType.DIM_2D else PointCloud
         )
         CVATDataExtractorMixin.__init__(self, **kwargs)
 
@@ -1755,10 +1741,12 @@ class CVATProjectDataExtractor(dm.Extractor, CVATDataExtractorMixin):
         self._dimension = dimension
         self._format_type = format_type
 
+        dm_items: List[dm.DatasetItem] = []
+
         if self._dimension == DimensionType.DIM_3D or include_images:
-            self._media_provider = MEDIA_PROVIDERS_BY_DIMENSION[self._dimension](
+            self._image_provider = IMAGE_PROVIDERS_BY_DIMENSION[self._dimension](
                 {
-                    task.id: MediaSource(task)
+                    task.id: ImageSource(task, is_video=task.mode == 'interpolation')
                     for task in project_data.tasks
                 }
             )
@@ -1769,57 +1757,43 @@ class CVATProjectDataExtractor(dm.Extractor, CVATDataExtractorMixin):
             for is_video in [task.mode == 'interpolation']
         }
 
-        dm_items: List[dm.DatasetItem] = []
         for frame_data in project_data.group_by_frame(include_empty=True):
-            dm_media_args = { 'path': frame_data.name + ext_per_task[frame_data.task_id] }
+            image_args = {
+                'path': frame_data.name + ext_per_task[frame_data.task_id],
+                'size': (frame_data.height, frame_data.width),
+            }
             if self._dimension == DimensionType.DIM_3D:
-                dm_media: dm.PointCloud = self._media_provider.get_media_for_frame(
-                    frame_data.task_id, frame_data.id, **dm_media_args
-                )
-
-                if not include_images:
-                    dm_media_args["extra_images"] = [
-                        dm.Image(path=osp.basename(image.path))
-                        for image in dm_media.extra_images
-                    ]
-                    dm_media = dm.PointCloud(**dm_media_args)
+                dm_image = self._image_provider.get_image_for_frame(
+                    frame_data.task_id, frame_data.id, **image_args)
+            elif include_images:
+                dm_image = self._image_provider.get_image_for_frame(
+                    frame_data.task_id, frame_data.idx, **image_args)
             else:
-                dm_media_args['size'] = (frame_data.height, frame_data.width)
-                if include_images:
-                    dm_media: dm.Image = self._media_provider.get_media_for_frame(
-                        frame_data.task_id, frame_data.idx, **dm_media_args
-                    )
-                else:
-                    dm_media = dm.Image(**dm_media_args)
-
+                dm_image = dm.Image(**image_args)
             dm_anno = self._read_cvat_anno(frame_data, project_data.meta[project_data.META_FIELD]['labels'])
-
-            dm_attributes = {'frame': frame_data.frame}
-
             if self._dimension == DimensionType.DIM_2D:
                 dm_item = dm.DatasetItem(
                     id=osp.splitext(frame_data.name)[0],
-                    annotations=dm_anno, media=dm_media,
+                    annotations=dm_anno, media=dm_image,
                     subset=frame_data.subset,
-                    attributes=dm_attributes,
+                    attributes={'frame': frame_data.frame}
                 )
-            elif self._dimension == DimensionType.DIM_3D:
+            else:
+                attributes = {'frame': frame_data.frame}
                 if format_type == "sly_pointcloud":
-                    dm_attributes["name"] = self._user["name"]
-                    dm_attributes["createdAt"] = self._user["createdAt"]
-                    dm_attributes["updatedAt"] = self._user["updatedAt"]
-                    dm_attributes["labels"] = []
+                    attributes["name"] = self._user["name"]
+                    attributes["createdAt"] = self._user["createdAt"]
+                    attributes["updatedAt"] = self._user["updatedAt"]
+                    attributes["labels"] = []
                     for (idx, (_, label)) in enumerate(project_data.meta[project_data.META_FIELD]['labels']):
-                        dm_attributes["labels"].append({"label_id": idx, "name": label["name"], "color": label["color"], "type": label["type"]})
-                        dm_attributes["track_id"] = -1
+                        attributes["labels"].append({"label_id": idx, "name": label["name"], "color": label["color"], "type": label["type"]})
+                        attributes["track_id"] = -1
 
                 dm_item = dm.DatasetItem(
                     id=osp.splitext(osp.split(frame_data.name)[-1])[0],
-                    annotations=dm_anno, media=dm_media,
-                    subset=frame_data.subset,
-                    attributes=dm_attributes,
+                    annotations=dm_anno, media=PointCloud(dm_image[0]), related_images=dm_image[1],
+                    attributes=attributes, subset=frame_data.subset
                 )
-
             dm_items.append(dm_item)
 
         self._items = dm_items
@@ -2468,27 +2442,18 @@ def load_dataset_data(project_annotation, dataset: dm.Dataset, project_data):
 
         project_annotation.add_task(task_fields, dataset_files, project_data)
 
-class NoMediaInAnnotationFileError(CvatImportError):
-    def __str__(self) -> str:
-        return (
-            "Can't import media data from the annotation file. "
-            "Please upload full dataset as a zip archive."
-        )
-
-def detect_dataset(dataset_dir: str, format_name: str, importer: dm.Importer) -> None:
+def detect_dataset(dataset_dir: str, format_name: str, importer: Importer) -> None:
     not_found_error_instance = CvatDatasetNotFoundError()
 
-    def _handle_rejection(format_name: str, reason: RejectionReason, human_message: str) -> None:
+    def not_found_error(_, reason, human_message):
         not_found_error_instance.format_name = format_name
         not_found_error_instance.reason = reason
         not_found_error_instance.message = human_message
 
-    detection_env = dm.Environment()
+    detection_env = Environment()
     detection_env.importers.items.clear()
     detection_env.importers.register(format_name, importer)
-    detected = detection_env.detect_dataset(
-        dataset_dir, depth=4, rejection_callback=_handle_rejection
-    )
+    detected = detection_env.detect_dataset(dataset_dir, depth=4, rejection_callback=not_found_error)
 
     if not detected and not_found_error_instance.reason != RejectionReason.detection_unsupported:
         raise not_found_error_instance

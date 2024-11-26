@@ -444,11 +444,8 @@ export default (state = defaultState, action: AnyAction): SettingsState => {
 
             return {
                 ...state,
+
                 imageFilters: filters,
-                shapes: {
-                    ...state.shapes,
-                    showGroundTruth: false,
-                },
             };
         }
         case AnnotationActionTypes.INTERACT_WITH_CANVAS: {

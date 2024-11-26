@@ -5,14 +5,20 @@
 from functools import cached_property
 
 import PIL.Image
+import torchvision.models
 
 import cvat_sdk.auto_annotation as cvataa
 import cvat_sdk.models as models
 
-from ._torchvision import TorchvisionFunction
 
+class _TorchvisionKeypointDetectionFunction:
+    def __init__(self, model_name: str, weights_name: str = "DEFAULT", **kwargs) -> None:
+        weights_enum = torchvision.models.get_model_weights(model_name)
+        self._weights = weights_enum[weights_name]
+        self._transforms = self._weights.transforms()
+        self._model = torchvision.models.get_model(model_name, weights=self._weights, **kwargs)
+        self._model.eval()
 
-class _TorchvisionKeypointDetectionFunction(TorchvisionFunction):
     @cached_property
     def spec(self) -> cvataa.DetectionFunctionSpec:
         return cvataa.DetectionFunctionSpec(
@@ -29,10 +35,7 @@ class _TorchvisionKeypointDetectionFunction(TorchvisionFunction):
             ]
         )
 
-    def detect(
-        self, context: cvataa.DetectionFunctionContext, image: PIL.Image.Image
-    ) -> list[models.LabeledShapeRequest]:
-        conf_threshold = context.conf_threshold or 0
+    def detect(self, context, image: PIL.Image.Image) -> list[models.LabeledShapeRequest]:
         results = self._model([self._transforms(image)])
 
         return [
@@ -48,10 +51,7 @@ class _TorchvisionKeypointDetectionFunction(TorchvisionFunction):
                 ],
             )
             for result in results
-            for keypoints, label, score in zip(
-                result["keypoints"], result["labels"], result["scores"]
-            )
-            if score >= conf_threshold
+            for keypoints, label in zip(result["keypoints"], result["labels"])
         ]
 
 

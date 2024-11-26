@@ -29,28 +29,15 @@ def main():
     for fragment_path in REPO_ROOT.glob("changelog.d/*.md"):
         with open(fragment_path) as fragment_file:
             for line_index, line in enumerate(fragment_file):
-                line = line.rstrip("\n")
+                if not line.startswith(md_header_prefix):
+                    # The first line should be a header, and all headers should be of appropriate level.
+                    if line_index == 0 or line.startswith("#"):
+                        complain(f"line should start with {md_header_prefix!r}")
+                    continue
 
-                if line_index == 0:
-                    # The first line should always be a header.
-                    if not line.startswith("#"):
-                        complain("line should be a header")
-                elif (
-                    line
-                    and not line.startswith("#")
-                    and not line.startswith("-")
-                    and not line.startswith("  ")
-                ):
-                    complain("line should be a header, a list item, or indented")
-
-                if line.startswith("#"):
-                    if line.startswith(md_header_prefix):
-                        category = line.removeprefix(md_header_prefix).strip()
-                        if category not in categories:
-                            complain(f"unknown category: {category}")
-                    else:
-                        # All headers should be of the same level.
-                        complain(f"header should start with {md_header_prefix!r}")
+                category = line.removeprefix(md_header_prefix).strip()
+                if category not in categories:
+                    complain(f"unknown category: {category}")
 
     sys.exit(0 if success else 1)
 
